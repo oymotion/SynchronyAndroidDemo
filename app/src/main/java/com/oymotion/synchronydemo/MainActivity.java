@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
                     //Log.d(TAG, "Device discovered: " + bluetoothDevice.toString() + ", Rssi:" + rssi);
 
                     if (bluetoothDevice != null && bluetoothDevice.getName() != null &&
-                            bluetoothDevice.getName().contains("gForce")) {
+                            bluetoothDevice.getName().contains("Synchrony")) {
                         Log.i(TAG, "Device discovered: " + bluetoothDevice.toString() + ", Rssi:" + rssi);
 
                         bluetoothDevices.add(bluetoothDevice);
