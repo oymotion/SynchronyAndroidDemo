@@ -49,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private void getPermission() {
         int permissionCheck = 0;
         permissionCheck = this.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION);
+        permissionCheck += this.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
         permissionCheck += this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION);
         permissionCheck += this.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE);
 
@@ -56,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
             //未获得权限
             this.requestPermissions( // 请求授权
                     new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                             Manifest.permission.ACCESS_COARSE_LOCATION,
                             Manifest.permission.READ_EXTERNAL_STORAGE},
                     ACCESS_LOCATION);// 自定义常量,任意整型
@@ -137,14 +139,14 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     //Log.d(TAG, "Device discovered: " + bluetoothDevice.toString() + ", Rssi:" + rssi);
 
-                    if (bluetoothDevice != null && bluetoothDevice.getName() != null &&
-                            bluetoothDevice.getName().contains("Synchrony")) {
+//                    if (bluetoothDevice != null && bluetoothDevice.getName() != null &&
+//                            bluetoothDevice.getName().contains("Synchrony")) {
                         Log.i(TAG, "Device discovered: " + bluetoothDevice.toString() + ", Rssi:" + rssi);
 
                         bluetoothDevices.add(bluetoothDevice);
 
                         resultsAdapter.addScanResult(new ScanResult(bluetoothDevice, rssi));
-                    }
+//                    }
                 });
             }
 
