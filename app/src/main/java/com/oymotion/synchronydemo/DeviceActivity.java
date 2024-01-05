@@ -63,6 +63,7 @@ public class DeviceActivity extends AppCompatActivity {
         public int packageSampleCount;
         public double K;
         static class Item{
+            public int timeStampInMs;
             public int rawDataSampleIndex;
             public int rawData;
             public float convertData;
@@ -321,6 +322,7 @@ public class DeviceActivity extends AppCompatActivity {
 
     private void readSamples(byte[] data, SynchronyData synchronyData, int offset, int lostSampleCount){
         int sampleCount = synchronyData.packageSampleCount;
+        int sampleInterval = 1000 / synchronyData.sampleRate;//sampleRate should be less than 1000ms;
         if (lostSampleCount > 0)
             sampleCount = lostSampleCount;
 
@@ -332,6 +334,7 @@ public class DeviceActivity extends AppCompatActivity {
                 if ((synchronyData.channelMask & (1 << channelIndex)) > 0){
                     SynchronyData.Item dataItem = new SynchronyData.Item();
                     dataItem.rawDataSampleIndex = lastSampleIndex;
+                    dataItem.timeStampInMs = lastSampleIndex * sampleInterval;
                     if (lostSampleCount > 0){
                         //add missing samples with 0
                         dataItem.rawData = 0;
