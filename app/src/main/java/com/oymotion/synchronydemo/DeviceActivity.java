@@ -49,12 +49,12 @@ public class DeviceActivity extends AppCompatActivity {
     static final int MAX_CHANNEL_COUNT = 8;
     static final int DATA_TYPE_EEG = 0;
     static final int DATA_TYPE_ECG = 1;
-    static final int DATA_TYPE_IMPEDANCE = 2;
-    static final int DATA_TYPE_COUNT = 3;
+    static final int DATA_TYPE_COUNT = 2;
 
-    static final int TIMEOUT = 5000;
+    static final int TIMEOUT = 50000;
 
     static class SynchronyData{
+        public int dataType;
         public int lastPackageIndex;
         public int resolutionBits;
         public int sampleRate;
@@ -63,10 +63,10 @@ public class DeviceActivity extends AppCompatActivity {
         public int packageSampleCount;
         public double K;
         static class Item{
-            public int timeStampInMs;
             public int rawDataSampleIndex;
             public int rawData;
             public float convertData;
+            public float impedance;
         }
         public Deque<Item> items[];
         public SynchronyData(){
@@ -78,6 +78,8 @@ public class DeviceActivity extends AppCompatActivity {
     }
     private SynchronyData synchronyDatas[] = new SynchronyData[DATA_TYPE_COUNT];
 
+    private Vector<Float> impedanceData = new Vector<Float>();
+    private int notifyDataFlag = 0;
     private SynchronyProfile synchronyProfile;
 
 
@@ -122,32 +124,23 @@ public class DeviceActivity extends AppCompatActivity {
     @OnClick(R.id.set)
     public void onSetClick() {
         if (state != SynchronyProfile.BluetoothDeviceStateEx.ready) return;
-
-//        int flags = SynchronyProfile.DataNotifFlags.DNF_IMPEDANCE | SynchronyProfile.DataNotifFlags.DNF_EEG | SynchronyProfile.DataNotifFlags.DNF_ECG;
-        int flags = SynchronyProfile.DataNotifFlags.DNF_EEG | SynchronyProfile.DataNotifFlags.DNF_ECG;
-
         response = -1;
-
-        synchronyProfile.setDataNotifSwitch(flags, new CommandResponseCallback() {
+        synchronyProfile.setDataNotifSwitch(notifyDataFlag, new CommandResponseCallback() {
             @Override
             public void onSetCommandResponse(int resp) {
                 if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS) {
                     Log.d(TAG, "Device State: " + "Set Data Switch succeeded");
-                    getEEG();
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            btn_start.setEnabled(true);
+                        }
+                    });
+
                 } else {
                     Log.d(TAG,  "Device State: " + "Set Data Switch failed, resp code: " + resp);
                 }
             }
         }, TIMEOUT);
-    }
-
-    private void allSuccessd(){
-        runOnUiThread(new Runnable() {
-            public void run() {
-                textViewState.setText("setup Synchrony success");
-                btn_start.setEnabled(true);
-            }
-        });
     }
 
     private void getEEG(){
@@ -157,6 +150,7 @@ public class DeviceActivity extends AppCompatActivity {
                 if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS) {
                     Log.d(TAG, "Device State: " + "get  EEG Config succeeded");
                     SynchronyData data = new SynchronyData();
+                    data.dataType = SynchronyProfile.NotifDataType.NTF_EEG;
                     data.sampleRate = sampleRate;
                     data.resolutionBits = resolutionBits;
                     data.channelMask = channelMask;
@@ -171,7 +165,7 @@ public class DeviceActivity extends AppCompatActivity {
                             if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS){
                                 Log.d(TAG, "Device State: " + "get  EEG Cap succeeded");
                                 synchronyDatas[DATA_TYPE_EEG].channelCount = maxChannelCount;
-                                getECG();
+                                notifyDataFlag |= (SynchronyProfile.DataNotifFlags.DNF_IMPEDANCE | SynchronyProfile.DataNotifFlags.DNF_EEG);
                             }else{
                                 Log.d(TAG, "Device State: " + "get  EEG Cap failed, resp code: " + resp);
                             }
@@ -192,6 +186,7 @@ public class DeviceActivity extends AppCompatActivity {
                 if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS) {
                     Log.d(TAG, "Device State: " + "get  ECG Config succeeded");
                     SynchronyData data = new SynchronyData();
+                    data.dataType = SynchronyProfile.NotifDataType.NTF_ECG;
                     data.sampleRate = sampleRate;
                     data.resolutionBits = resolutionBits;
                     data.channelMask = channelMask;
@@ -206,7 +201,7 @@ public class DeviceActivity extends AppCompatActivity {
                             if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS){
                                 Log.d(TAG, "Device State: " + "get  ECG Cap succeeded");
                                 synchronyDatas[DATA_TYPE_ECG].channelCount = maxChannelCount;
-                                getImpedance();
+                                notifyDataFlag |= (SynchronyProfile.DataNotifFlags.DNF_IMPEDANCE | SynchronyProfile.DataNotifFlags.DNF_ECG);
                             }else{
                                 Log.d(TAG, "Device State: " + "get  ECG Cap failed, resp code: " + resp);
                             }
@@ -214,42 +209,6 @@ public class DeviceActivity extends AppCompatActivity {
                     }, TIMEOUT);
                 } else {
                     Log.d(TAG, "Device State: " + "get ECG Config failed, resp code: " + resp);
-                }
-            }
-        }, TIMEOUT);
-    }
-
-    private void getImpedance(){
-        synchronyProfile.getImpedanceDataConfig(new CommandResponseCallback() {
-            @Override
-            public void onGetImpedanceDataConfig(int resp, int sampleRate, int channelMask, int packageSampleCount, int resolutionBits, double ohmConversionK) {
-                String msg;
-
-                if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS) {
-                    Log.d(TAG,  "Device State: " + "get impedance Config succeeded");
-                    SynchronyData data = new SynchronyData();
-                    data.sampleRate = sampleRate;
-                    data.resolutionBits = resolutionBits;
-                    data.channelMask = channelMask;
-                    data.packageSampleCount = packageSampleCount;
-                    data.K = ohmConversionK;
-                    data.lastPackageIndex = 0;
-                    synchronyDatas[DATA_TYPE_IMPEDANCE] = data;
-
-                    synchronyProfile.getImpedanceDataCap(new CommandResponseCallback() {
-                        @Override
-                        public void onGetImpedanceDataCap(int resp, int[] supportedSampleRates, int maxChannelCount, int maxPackageSampleCount, int[] supportedResolutionBits) {
-                            if (resp == SynchronyProfile.ResponseResult.RSP_CODE_SUCCESS){
-                                Log.d(TAG, "Device State: " + "get  impedance Cap succeeded");
-                                synchronyDatas[DATA_TYPE_IMPEDANCE].channelCount = maxChannelCount;
-                                allSuccessd();
-                            }else{
-                                Log.d(TAG, "Device State: " + "get  impedance Cap failed, resp code: " + resp);
-                            }
-                        }
-                    }, TIMEOUT);
-                } else {
-                    msg = ("Device State: " + "get impedance Config failed, resp code: " + resp);
                 }
             }
         }, TIMEOUT);
@@ -267,25 +226,40 @@ public class DeviceActivity extends AppCompatActivity {
         } else {
             if (state != SynchronyProfile.BluetoothDeviceStateEx.ready) return;
 
-            for (int index = 0;index < 3;++index){
+            for (int index = 0;index < DATA_TYPE_COUNT;++index){
+                if (synchronyDatas[index] == null)
+                    continue;
                 synchronyDatas[index].lastPackageIndex = 0;
                 for (int index1 = 0;index1 < MAX_CHANNEL_COUNT;++index1){
                     synchronyDatas[index].items[index1].clear();
+                    impedanceData.clear();
                 }
             }
             synchronyProfile.startDataNotification(new DataNotificationCallback() {
                 @Override
                 public void onData(byte[] data) {
                     Log.i("DeviceActivity", "data type: " + data[0] + ", len: " + data.length);
-                    if (data[0] == SynchronyProfile.NotifDataType.NTF_EEG ||
-                            data[0] == SynchronyProfile.NotifDataType.NTF_ECG ||
-                            data[0] == SynchronyProfile.NotifDataType.NTF_IMPEDANCE){
+                    if (data[0] == SynchronyProfile.NotifDataType.NTF_IMPEDANCE){
+                        int offset = 1;
+                        int packageIndex = ((data[offset + 1] & 0xff) << 8 | (data[offset] & 0xff));
+                        offset += 2;
+                        Log.d(TAG, "impedance package index: " + packageIndex);
+                        impedanceData.clear();
+                        int dataCount = (data.length - 3) / 4;
+                        for (int index = 0;index < dataCount;++index){
+                            float impedance = getFloat(data, offset);
+                            offset += 4;
+                            impedanceData.add(impedance);
+                        }
+                        Log.d(TAG, "impedance: " + impedanceData.get(7));
+                    }else if (data[0] == SynchronyProfile.NotifDataType.NTF_EEG ||
+                            data[0] == SynchronyProfile.NotifDataType.NTF_ECG ){
                         int dataType = data[0] - SynchronyProfile.NotifDataType.NTF_EEG;
                         SynchronyData synchronyData = synchronyDatas[dataType];
                         int offset = 1;
                         try{
                             int packageIndex = ((data[offset + 1] & 0xff) << 8 | (data[offset] & 0xff));
-                            Log.d(TAG, "package index: " + packageIndex);
+//                            Log.d(TAG, "package index: " + packageIndex);
                             offset += 2;
                             int newPackageIndex = packageIndex;
                             int lastPackageIndex = synchronyData.lastPackageIndex;
@@ -310,7 +284,6 @@ public class DeviceActivity extends AppCompatActivity {
                         }catch (Exception e){
                             Log.d("DeviceActivity", "error in process data" + e.getLocalizedMessage());
                         }
-
                     }
                 }
             });
@@ -320,9 +293,17 @@ public class DeviceActivity extends AppCompatActivity {
         }
     }
 
+    private static float getFloat(byte[] b, int offset) {
+        int accum = 0;
+        accum = accum | (b[offset + 0] & 0xff) << 0;
+        accum = accum | (b[offset + 1] & 0xff) << 8;
+        accum = accum | (b[offset + 2] & 0xff) << 16;
+        accum = accum | (b[offset + 3] & 0xff) << 24;
+        return Float.intBitsToFloat(accum);
+    }
+
     private void readSamples(byte[] data, SynchronyData synchronyData, int offset, int lostSampleCount){
         int sampleCount = synchronyData.packageSampleCount;
-        int sampleInterval = 1000 / synchronyData.sampleRate;//sampleRate should be less than 1000ms;
         if (lostSampleCount > 0)
             sampleCount = lostSampleCount;
 
@@ -330,11 +311,19 @@ public class DeviceActivity extends AppCompatActivity {
         int lastSampleIndex = synchronyData.lastPackageIndex * synchronyData.packageSampleCount;
 
         for (int sampleIndex = 0;sampleIndex < sampleCount; ++sampleIndex, ++lastSampleIndex){
-            for (int channelIndex = 0; channelIndex < synchronyData.channelCount; ++channelIndex){
+            for (int channelIndex = 0, impedanceIndex = 0; channelIndex < synchronyData.channelCount; ++channelIndex){
                 if ((synchronyData.channelMask & (1 << channelIndex)) > 0){
+                    if (synchronyData.dataType == SynchronyProfile.NotifDataType.NTF_ECG){
+                        impedanceIndex = impedanceData.size() - 1;
+                    }
+                    float impedance = 0;
+                    if (impedanceIndex < impedanceData.size()){
+                        impedance = impedanceData.get(impedanceIndex);
+                    }
+                    ++impedanceIndex;
                     SynchronyData.Item dataItem = new SynchronyData.Item();
                     dataItem.rawDataSampleIndex = lastSampleIndex;
-                    dataItem.timeStampInMs = lastSampleIndex * sampleInterval;
+                    dataItem.impedance = impedance;
                     if (lostSampleCount > 0){
                         //add missing samples with 0
                         dataItem.rawData = 0;
@@ -384,6 +373,8 @@ public class DeviceActivity extends AppCompatActivity {
         if (result != SynchronyProfile.GF_RET_CODE.GF_SUCCESS) {
             textFirmwareVersion.setText("FirmwareVersion: Error : " + result);
         }
+        getEEG();
+        getECG();
     }
 
 
